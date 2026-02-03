@@ -1,0 +1,258 @@
+{
+  "name": "finance-news",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8,
+              "triggerAtMinute": 1
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -624,
+        -128
+      ],
+      "id": "25797fad-b6ff-47dd-be6d-b9e44f047cca",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "url": "https://www.bankier.pl/rss/wiadomosci.xml",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        -272,
+        -144
+      ],
+      "id": "80a6d969-8662-41e4-a4d4-0b69bb87e9e5",
+      "name": "RSS Read"
+    },
+    {
+      "parameters": {
+        "url": "https://finance.yahoo.com/news/rssindex",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        -272,
+        16
+      ],
+      "id": "6c801f5e-34bb-4cc2-b99b-280ff5258b88",
+      "name": "RSS Read1"
+    },
+    {
+      "parameters": {
+        "url": "http://api.nbp.pl/api/exchangerates/tables/a/?format=json",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -464,
+        -144
+      ],
+      "id": "30285528-cdd4-49ae-bd80-a8c6ddca6070",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -48,
+        -96
+      ],
+      "id": "57b19c05-2ef4-4f20-8398-ae57512f5a11",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "maxItems": 4
+      },
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        160,
+        -96
+      ],
+      "id": "b9dc4d54-f612-469f-9297-860a831d32e1",
+      "name": "Limit"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=### SYSTEM INSTRUCTIONS\nYou are a professional news curator.\nYour goal is to select the 3 most interesting articles based on the provided CONTENT, translate them to English, and summarize them with specific details.\n\n### CRITICAL RULES\n1. Input is Polish, output must be ONLY in ENGLISH.\n2. Do not just rephrase the title. Use facts from the \"CONTENT\" field (numbers, names, specific events).\n3. Keep it concise (bullet points).\n4. Tone: Casual, morning coffee style ☕.\n\n### INPUT DATA\n{{ $input.all().map(i => \"TITLE: \" + i.json.title + \"\\nCONTENT: \" + i.json.contentSnippet).join(\"\\n\\n\") }}\n\n### RESPONSE FORMAT\n☕ [English Title]\n   [Summary containing specific facts like numbers or names mentioned in the content]\n\n(Repeat for top 3)",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        368,
+        -96
+      ],
+      "id": "e9729cee-65a6-47cb-9bbb-03a021bd9604",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.1-8b-instant",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        304,
+        112
+      ],
+      "id": "7822a370-1337-4cff-bbe9-26a19d943283",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "abq7y9006OqtTU21",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "7277501080",
+        "text": "=🚀 <b>MarketPulse</b>\n\n💰 <b>Exchange Rates:</b>\n🇺🇸 USD: {{ $('HTTP Request').first().json.rates.find(r => r.code === 'USD').mid.toFixed(4) }} PLN\n🇪🇺 EUR: {{ $('HTTP Request').first().json.rates.find(r => r.code === 'EUR').mid.toFixed(4) }} PLN\n\n------------------\n\n📰 <b>Quick Market Overview:</b>\n\n{{ $('Basic LLM Chain').first().json.content || $('Basic LLM Chain').first().json.text }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        720,
+        -96
+      ],
+      "id": "a3bfa546-30c1-4d0f-a48b-9a94f4e7fd3c",
+      "name": "Send a text message",
+      "webhookId": "24453f30-dc1e-45a1-8381-6a94751c5e0e",
+      "credentials": {
+        "telegramApi": {
+          "id": "NJ46Drfdjt41D0FS",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Read": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Read1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "RSS Read",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS Read1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "68ac8c91-6b0a-43d7-a90a-cd8c30883125",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ae11709860e7339aaab7e53f29da618e8875909b8071da202b04775f89ce7ead"
+  },
+  "id": "E_kPgbQ8wGOcjmoWNga3n",
+  "tags": []
+}
